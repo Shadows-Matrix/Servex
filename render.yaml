@@ -1,0 +1,36 @@
+# Render Blueprint for SERVEX (Next.js 16 full-stack + external Neon Postgres)
+# Deploy: Dashboard → New → Blueprint → select this repo.
+# After first deploy, set AUTH_URL to the service URL (e.g. https://servex.onrender.com).
+# Migrations are applied to Neon from dev machines (npm run db:migrate) — not at build time.
+
+services:
+  - type: web
+    name: servex
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      # Neon Postgres (same values as local .env)
+      - key: DATABASE_URL
+        sync: false
+      # Auth.js v5 — generate with: openssl rand -base64 32
+      - key: AUTH_SECRET
+        generateValue: true
+      # Set to the Render service URL after first deploy
+      - key: AUTH_URL
+        sync: false
+      # Gmail SMTP for OTP delivery (App password, not the Gmail password)
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: 587
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM
+        sync: false
