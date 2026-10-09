@@ -19,7 +19,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { User, Briefcase } from "lucide-react";
-import { apiFetch } from "@/lib/api-client";
+import { apiFetch, ApiClientError } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 
 const emailSchema = z.object({
@@ -118,7 +118,15 @@ export function LoginForm({
       setSecsLeft(res.expiresInSecs ?? 60);
       setSignupToken(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not send code");
+      // MAIL_FAILED (502) means the email never sent and no challenge was
+      // kept — the user can retry immediately instead of waiting out resend.
+      if (err instanceof ApiClientError && err.code === "MAIL_FAILED") {
+        setError(`${err.message} You can retry right away — no need to wait.`);
+      } else if (err instanceof ApiClientError && err.code === "DB_ERROR") {
+        setError("Our database is briefly unavailable. Please try again in a moment.");
+      } else {
+        setError(err instanceof Error ? err.message : "Could not send code");
+      }
     } finally {
       setBusy(false);
     }

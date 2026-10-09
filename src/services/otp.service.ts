@@ -33,17 +33,18 @@ function safeEqualHex(a: string, b: string) {
  * server log + dev code so local development still works.
  */
 async function sendOtpCode(destination: string, code: string) {
-  const { mailConfigured, sendMail, otpEmailHtml } = await import("@/lib/mailer");
-  if (mailConfigured) {
+  const { isMailConfigured, sendMail, otpEmailHtml } = await import("@/lib/mailer");
+  if (isMailConfigured()) {
     await sendMail(
       destination,
       "Your SERVEX verification code",
       otpEmailHtml(code),
-      `Your SERVEX verification code is ${code}. It expires in 1 minute.`
+      `Your SERVEX verification code is ${code}. It expires in 10 minutes.`
     );
-    return;
+    return true;
   }
   console.log(`[OTP] SMTP not configured — code for ${destination}: ${code}`);
+  return false;
 }
 
 export const otpService = {
@@ -92,7 +93,13 @@ export const otpService = {
       },
     });
 
-    await sendOtpCode(email, code);
+    await sendOtpCode(email, code).catch(async (mailErr) => {
+      // Roll back the challenge so the user can retry immediately
+      // instead of hitting RESEND_COOLDOWN on an email that never sent.
+      await prisma.otpChallenge.delete({ where: { id: challenge.id } }).catch(() => {});
+      const message = mailErr instanceof Error ? mailErr.message : "Could not send the verification email.";
+      throw new ApiError(502, message, "MAIL_FAILED");
+    });
 
     return {
       requiresOtp: true as const,
